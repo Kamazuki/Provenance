@@ -21,8 +21,6 @@
 
 @interface PVControllerViewController ()
 
-@property (nonatomic, strong) NSArray *controlLayout;
-
 @end
 
 @implementation PVControllerViewController

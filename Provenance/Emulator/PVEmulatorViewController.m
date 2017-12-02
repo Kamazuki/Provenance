@@ -41,6 +41,7 @@
 @property (nonatomic, strong) UIWindow *secondaryWindow;
 @property (nonatomic, strong) UITapGestureRecognizer *menuGestureRecognizer;
 
+@property (nonatomic, weak) id<PVEmulatorViewControllerDelegate> m_delegate;
 
 @end
 
@@ -61,11 +62,12 @@ void uncaughtExceptionHandler(NSException *exception)
 	}
 }
 
-- (instancetype)initWithGame:(PVGame *)game;
+- (instancetype)initWithGame:(PVGame *)game netController:(id<PVEmulatorViewControllerDelegate>)tempDelegate
 {
 	if ((self = [super init]))
 	{
 		_staticEmulatorViewController = self;
+        self.m_delegate = tempDelegate;
 		self.game = game;
 	}
 	
@@ -151,6 +153,7 @@ void uncaughtExceptionHandler(NSException *exception)
 											   object:nil];
 
 	self.emulatorCore = [[PVEmulatorConfiguration sharedInstance] emulatorCoreForSystemIdentifier:[self.game systemIdentifier]];
+    self.emulatorCore.m_netDelegate = self.m_delegate;
     [self.emulatorCore setSaveStatesPath:[self saveStatePath]];
 	[self.emulatorCore setBatterySavesPath:[self batterySavesPath]];
     [self.emulatorCore setBIOSPath:self.BIOSPath];
@@ -781,7 +784,12 @@ void uncaughtExceptionHandler(NSException *exception)
 
 - (void)quit
 {
-    [self quit:NULL];
+    [self quit:^{
+        if ([self.m_delegate respondsToSelector:@selector(onPVEmulatorViewControllerQuit)])
+        {
+            [self.m_delegate onPVEmulatorViewControllerQuit];
+        }
+    }];
 }
 
 - (void)quit:(void(^)(void))completion

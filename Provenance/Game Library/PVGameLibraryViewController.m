@@ -38,6 +38,12 @@
 #import "RLMRealmConfiguration+Config.h"
 #import "PVEmulatorConstants.h"
 #import "PVAppConstants.h"
+#import "PVGameRoomListViewController.h"
+#import "PVGameRoomViewController.h"
+#import <PVGenesis/PVGenesisEmulatorCore.h>
+#import <PVSupport/PVEmulatorCore.h>
+#import "PVGameClientReal.h"
+#import "PVGameClientVirtual.h"
 
 NSString * const PVGameLibraryHeaderView = @"PVGameLibraryHeaderView";
 NSString * const kRefreshLibraryNotification = @"kRefreshLibraryNotification";
@@ -49,6 +55,12 @@ static const CGFloat CellWidth = 308.0;
 #endif
 
 @interface PVGameLibraryViewController ()
+<
+    PVGameRoomViewControllerDelegate,
+    PVEmulatorViewControllerDelegate,
+    PVGameClientDelegate,
+    PVGameRoomListViewControllerDelegate
+>
 
 @property (nonatomic, strong) RLMRealm *realm;
 @property (nonatomic, strong) PVDirectoryWatcher *watcher;
@@ -69,6 +81,10 @@ static const CGFloat CellWidth = 308.0;
 @property (nonatomic, strong) NSDictionary *gamesInSections;
 @property (nonatomic, strong) NSArray *sectionInfo;
 @property (nonatomic, strong) RLMResults *searchResults;
+
+@property (nonatomic, strong) id<PVGameClient> m_gameClient;
+
+@property (nonatomic, weak) PVEmulatorViewController* m_emulatorViewController;
 
 @property (nonatomic, assign) IBOutlet UITextField *searchField;
 
@@ -870,15 +886,20 @@ static NSString *_reuseIdentifier = @"PVGameLibraryCollectionViewCell";
 
 - (void)loadGame:(PVGame *)game
 {
+    [self loadGame:game netController:nil];
+}
+
+- (void)loadGame:(PVGame *)game netController:(id<PVEmulatorViewControllerDelegate>) tempDelegate
+{
     void (^loadGame)(void) = ^void(void) {
         if ([self canLoadGame:game])
         {
-            PVEmulatorViewController *emulatorViewController = [[PVEmulatorViewController alloc] initWithGame:game];
+            PVEmulatorViewController *emulatorViewController = [[PVEmulatorViewController alloc] initWithGame:game netController:tempDelegate];
             [emulatorViewController setBatterySavesPath:[self batterySavesPathForROM:[[self romsPath] stringByAppendingPathComponent:[game romPath]]]];
             [emulatorViewController setSaveStatePath:[self saveStatePathForROM:[[self romsPath] stringByAppendingPathComponent:[game romPath]]]];
             [emulatorViewController setBIOSPath:[self BIOSPathForSystemID:[game systemIdentifier]]];
             [emulatorViewController setModalTransitionStyle:UIModalTransitionStyleCrossDissolve];
-
+            self.m_emulatorViewController = emulatorViewController;
             [self presentViewController:emulatorViewController animated:YES completion:NULL];
              [[[PVControllerManager sharedManager] iCadeController] refreshListener];
             [self updateRecentGames:game];
@@ -1004,6 +1025,14 @@ static NSString *_reuseIdentifier = @"PVGameLibraryCollectionViewCell";
             [[actionSheet popoverPresentationController] setSourceView:cell];
             [[actionSheet popoverPresentationController] setSourceRect:[[self.collectionView layoutAttributesForItemAtIndexPath:indexPath] bounds]];
         }
+        
+        [actionSheet addAction:[UIAlertAction actionWithTitle:@"create room" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+            [weakSelf createGameRoom:game];
+        }]];
+        
+        [actionSheet addAction:[UIAlertAction actionWithTitle:@"join room" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+            [weakSelf joinGameRoom:game];
+        }]];
 
         [actionSheet addAction:[UIAlertAction actionWithTitle:@"Toggle Favorite"
                                                         style:UIAlertActionStyleDefault
@@ -1071,6 +1100,26 @@ static NSString *_reuseIdentifier = @"PVGameLibraryCollectionViewCell";
         [actionSheet addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:NULL]];
         [weakSelf presentViewController:actionSheet animated:YES completion:NULL];
     }
+}
+
+- (void)createGameRoom:(PVGame*) game
+{
+    self.m_gameClient = [[PVGameClientVirtual alloc] init];
+    [self.m_gameClient setDelegate:self];
+    PVGameRoomViewController* tempViewController = [[PVGameRoomViewController alloc] initWithGame:game client:self.m_gameClient];
+    tempViewController.m_delegate = self;
+    [self.m_gameClient start];
+    [self.navigationController pushViewController:tempViewController animated:YES];
+}
+
+-(void)joinGameRoom:(PVGame*) game
+{
+    self.m_gameClient = [[PVGameClientReal alloc] init];
+    [self.m_gameClient setDelegate:self];
+    PVGameRoomListViewController* tempViewController = [[PVGameRoomListViewController alloc] initWithGame:game client:self.m_gameClient];
+    tempViewController.m_delegate = self;
+    [self.m_gameClient start];
+    [self.navigationController pushViewController:tempViewController animated:YES];
 }
 
 - (void)toggleFavoriteForGame:(PVGame *)game {
@@ -1772,4 +1821,50 @@ static NSString *_reuseIdentifier = @"PVGameLibraryCollectionViewCell";
 - (BOOL)canBecomeFirstResponder {
     return YES;
 }
+
+#pragma mark - PVGameRoomListViewControllerDelegate
+-(void) onPVGameRoomListViewControllerStartGame:(PVGame *)tempGame
+{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self loadGame:tempGame netController:self];
+    });
+}
+
+#pragma mark - PVGameRoomViewControllerDelegate
+-(void) onPVGameRoomViewControllerStartGame:(PVGame *)tempGame info:(PVModelStartGame *)tempInfo
+{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(tempInfo.m_delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self loadGame:tempGame netController:self];
+    });
+}
+
+#pragma mark - PVGameClientDelegate
+
+#pragma mark - PVEmulatorViewControllerDelegate
+-(void) onPVEmulatorViewControllerQuit
+{
+    self.m_gameClient = nil;
+}
+
+#pragma mark - NetControllerDelegate
+-(void) sendGameStatus:(unsigned long long) tempStatus
+{
+    [self.m_gameClient sendGameStatus:tempStatus];
+}
+
+-(BOOL) isGameStatusOk
+{
+    return [self.m_gameClient isGameStatusOk];
+}
+
+-(BOOL) shouldSkipFrame
+{
+    return [self.m_gameClient shouldSkipFrame];
+}
+
+-(unsigned long long) nextGameStatus
+{
+    return [self.m_gameClient nextGameStatus];
+}
+
 @end

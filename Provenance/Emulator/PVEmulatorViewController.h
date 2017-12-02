@@ -10,8 +10,15 @@
 #import "JSDPad.h"
 #import "JSButton.h"
 #import "PVControllerViewController.h"
+#import <PVSupport/PVEmulatorCore.h>
 
 @class PVEmulatorCore, PVGame;
+
+@protocol PVEmulatorViewControllerDelegate <NetControllerDelegate>
+
+-(void) onPVEmulatorViewControllerQuit;
+
+@end
 
 #if TARGET_OS_TV
 @interface PVEmulatorViewController : GCEventViewController
@@ -19,14 +26,13 @@
 @interface PVEmulatorViewController : UIViewController
 #endif
 
-
 @property (nonatomic, strong) PVEmulatorCore *emulatorCore;
 @property (nonatomic, strong) PVGame *game;
 @property (nonatomic, copy) NSString *batterySavesPath;
 @property (nonatomic, copy) NSString *saveStatePath;
 @property (nonatomic, copy) NSString *BIOSPath;
 
-- (instancetype)initWithGame:(PVGame *)game;
+- (instancetype)initWithGame:(PVGame *)game netController:(id<PVEmulatorViewControllerDelegate>) tempDelegate;
 - (void)quit;
 - (void)quit:(void(^)(void))completion;
 

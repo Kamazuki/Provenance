@@ -12,11 +12,16 @@
 #import <OpenGLES/EAGL.h>
 #import <OpenGLES/ES3/gl.h>
 
+#define CONTROLLER_DEVICE_COUNT 2
+#define CONTROLLER_BUTTON_COUNT 12
+
 @interface PVGenesisEmulatorCore ()
 {
 	uint16_t *_videoBuffer;
 	int _videoWidth, _videoHeight;
-	int16_t _pad[2][12];
+	int16_t _pad[CONTROLLER_DEVICE_COUNT][CONTROLLER_BUTTON_COUNT];
+    
+    int16_t net_pad[CONTROLLER_DEVICE_COUNT][CONTROLLER_BUTTON_COUNT];
 }
 
 @end
@@ -79,26 +84,28 @@ static int16_t input_state_callback(unsigned port, unsigned device, unsigned ind
 
     if (port == 0 & device == RETRO_DEVICE_JOYPAD)
 	{
-        if (strongCurrent.controller1)
+        if (strongCurrent.m_netDelegate)
+        {
+            value = strongCurrent->net_pad[0][_id];
+        }
+        else if (strongCurrent.controller1)
         {
             value = [strongCurrent controllerValueForButtonID:_id forPlayer:port];
         }
-
-        if (value == 0)
+        else
         {
             value = strongCurrent->_pad[0][_id];
         }
 	}
 	else if(port == 1 & device == RETRO_DEVICE_JOYPAD)
 	{
-        if (strongCurrent.controller2)
+        if (strongCurrent.m_netDelegate)
+        {
+            value = strongCurrent->net_pad[1][_id];
+        }
+        else if (strongCurrent.controller2)
         {
             value = [strongCurrent controllerValueForButtonID:_id forPlayer:port];
-        }
-
-        if (value == 0)
-        {
-            value = strongCurrent->_pad[1][_id];
         }
 	}
 	
@@ -150,6 +157,49 @@ static bool environment_callback(unsigned cmd, void *data)
 - (void)dealloc
 {
 	free(_videoBuffer);
+}
+
+#pragma mark - Controller
+-(unsigned long long) getControllerStatus
+{
+    unsigned long long tempResult = 0;
+    for (int deviceIndex = 0; deviceIndex < CONTROLLER_DEVICE_COUNT; deviceIndex ++)
+    {
+        for (int buttonIndex = 0; buttonIndex < CONTROLLER_BUTTON_COUNT; buttonIndex ++)
+        {
+            if (_pad[deviceIndex][buttonIndex] == 0)
+            {
+                continue;
+            }
+            tempResult |= (1 << deviceIndex * CONTROLLER_BUTTON_COUNT + buttonIndex);
+        }
+    }
+    return tempResult;
+}
+
+-(void) updateControllerWithNetStatus:(unsigned long long) netStatus;
+{
+    for (int deviceIndex = 0; deviceIndex < CONTROLLER_DEVICE_COUNT; deviceIndex ++)
+    {
+        for (int buttonIndex = 0; buttonIndex < CONTROLLER_BUTTON_COUNT; buttonIndex ++)
+        {
+            if ((netStatus & (1 << deviceIndex * CONTROLLER_BUTTON_COUNT + buttonIndex)) == 0)
+            {
+                net_pad[deviceIndex][buttonIndex] = 0;
+            }
+            else
+            {
+                if (deviceIndex == 1)
+                {
+                    net_pad[deviceIndex][buttonIndex] = 1;
+                }
+                else
+                {
+                    net_pad[deviceIndex][buttonIndex] = 1;
+                }
+            }
+        }
+    }
 }
 
 #pragma mark - Execution

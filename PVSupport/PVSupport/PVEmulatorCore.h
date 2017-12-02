@@ -18,6 +18,12 @@
  */
 #define GET_CURRENT_OR_RETURN(...) __strong __typeof__(_current) current = _current; if(current == nil) return __VA_ARGS__;
 
+@interface PadNumber : NSObject
+
+@property(nonatomic, assign) unsigned int m_press;
+
+@end
+
 @class OERingBuffer;
 extern NSString *const PVEmulatorCoreErrorDomain;
 
@@ -32,6 +38,15 @@ typedef NS_ENUM(NSInteger, PVEmulatorCoreErrorCode) {
 
 #define GetSecondsSince(x) (-[x timeIntervalSinceNow])
 
+@protocol NetControllerDelegate <NSObject>
+
+-(BOOL) isGameStatusOk;
+-(BOOL) shouldSkipFrame;
+-(unsigned long long) nextGameStatus;
+-(void) sendGameStatus:(unsigned long long) tempStatus;
+
+@end
+
 @interface PVEmulatorCore : NSObject {
 	
 	OERingBuffer __strong **ringBuffers;
@@ -45,6 +60,10 @@ typedef NS_ENUM(NSInteger, PVEmulatorCoreErrorCode) {
     BOOL shouldStop;
 }
 
+
+@property (nonatomic, weak) id<NetControllerDelegate> m_netDelegate;
+-(unsigned long long) getControllerStatus;
+-(void) updateControllerWithNetStatus:(unsigned long long) netStatus;
 @property (nonatomic, assign) double emulationFPS;
 
 @property (nonatomic, copy) NSString *romName;

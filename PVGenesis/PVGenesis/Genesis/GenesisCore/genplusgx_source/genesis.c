@@ -54,11 +54,134 @@ static uint8 tmss[4];     /* TMSS security register */
 /*--------------------------------------------------------------------------*/
 /* Init, reset, shutdown functions                                          */
 /*--------------------------------------------------------------------------*/
+void gen_clear_m68k(void)
+{
+    for (int i = 0; i < 256; i ++)
+    {
+        m68k.memory_map[i].base     = NULL; /* for VDP DMA */
+        m68k.memory_map[i].read8    = NULL;
+        m68k.memory_map[i].read16   = NULL;
+        m68k.memory_map[i].write8   = NULL;
+        m68k.memory_map[i].write16  = NULL;
+        zbank_memory_map[i].read    = NULL;
+        zbank_memory_map[i].write   = NULL;
+    }
+    
+    m68k.poll.pc = 0;
+    m68k.poll.cycle = 0;
+    m68k.poll.detected = 0;
+    
+    m68k.cycles = 0;
+    m68k.cycle_end = 0;
+    
+    for (int i = 0; i < 16; i ++)
+    {
+        m68k.dar[i] = 0;
+    }
+    
+    m68k.pc = 0;
+    
+    for (int i = 0; i < 5; i ++)
+    {
+        m68k.sp[i] = 0;
+    }
+    
+    m68k.ir = 0;
+    m68k.t1_flag = 0;
+    m68k.s_flag = 0;
+    m68k.x_flag = 0;
+    m68k.n_flag = 0;
+    m68k.not_z_flag = 0;
+    m68k.v_flag = 0;
+    m68k.c_flag = 0;
+    m68k.int_mask = 0;
+    m68k.int_level = 0;
+    m68k.stopped = 0;
+    m68k.pref_addr = 0;
+    m68k.pref_data = 0;
+    m68k.instr_mode = 0;
+    m68k.run_mode = 0;
+    m68k.aerr_enabled = 0;
+    
+    for (int i = 0; i < _JBLEN; i ++)
+    {
+        m68k.aerr_trap[i] = 0;
+    }
+    
+    m68k.aerr_address = 0;
+    m68k.aerr_write_mode = 0;
+    m68k.aerr_fc = 0;
+    
+    m68k.tracing = 0;
+    m68k.address_space = 0;
+}
+
+void gen_clear_PAIR(PAIR* temp)
+{
+#ifdef LSB_FIRST
+    temp->b.l = 0;
+    temp->b.h = 0;
+    temp->b.h2 = 0;
+    temp->b.h3 = 0;
+    
+    temp->w.l = 0;
+    temp->w.h = 0;
+#else
+    temp->b.h3 = 0;
+    temp->b.h2 = 0;
+    temp->b.h = 0;
+    temp->b.l = 0;
+    
+    temp->w.h = 0;
+    temp->w.l = 0;
+#endif
+    
+    temp->d = 0;
+}
+
+void gen_clear_z80(void)
+{
+    gen_clear_PAIR(&(Z80.pc));
+    gen_clear_PAIR(&(Z80.sp));
+    gen_clear_PAIR(&(Z80.af));
+    gen_clear_PAIR(&(Z80.bc));
+    gen_clear_PAIR(&(Z80.de));
+    gen_clear_PAIR(&(Z80.hl));
+    gen_clear_PAIR(&(Z80.ix));
+    gen_clear_PAIR(&(Z80.iy));
+    gen_clear_PAIR(&(Z80.wz));
+    
+    gen_clear_PAIR(&(Z80.af2));
+    gen_clear_PAIR(&(Z80.bc2));
+    gen_clear_PAIR(&(Z80.de2));
+    gen_clear_PAIR(&(Z80.hl2));
+    
+    Z80.r = 0;
+    Z80.r2 = 0;
+    Z80.iff1 = 0;
+    Z80.iff2 = 0;
+    Z80.halt = 0;
+    Z80.im = 0;
+    Z80.i = 0;
+    
+    Z80.nmi_state = 0;
+    Z80.nmi_pending = 0;
+    Z80.irq_state = 0;
+    Z80.after_ei = 0;
+    Z80.cycles = 0;
+}
 
 void gen_init(void)
 {
+    memset(work_ram, 0x00, sizeof (work_ram));
+    memset(zram, 0x00, sizeof (zram));
+    
+    gen_clear_m68k();
+    gen_clear_z80();
   int i;
 
+    int a = 0;
+    a = 50;
   /* initialize Z80 */
   z80_init(0,z80_irq_callback);
 

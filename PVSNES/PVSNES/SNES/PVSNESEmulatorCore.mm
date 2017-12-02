@@ -60,6 +60,9 @@ static __weak PVSNESEmulatorCore *_current;
     unsigned char *videoBuffer;
     unsigned char *videoBufferA;
     unsigned char *videoBufferB;
+    
+    unsigned int net_pad[2][PVSNESButtonCount];
+    unsigned int last_net_pad[2][PVSNESButtonCount];
 }
 
 @end
@@ -83,6 +86,15 @@ NSString *SNESEmulatorKeys[] = { @"Up", @"Down", @"Left", @"Right", @"A", @"B", 
 		soundBuffer = (UInt16 *)malloc(SIZESOUNDBUFFER * sizeof(UInt16));
 		memset(soundBuffer, 0, SIZESOUNDBUFFER * sizeof(UInt16));
         _current = self;
+        
+        for (int i = 0; i < 2; i ++)
+        {
+            for (int j = 0; j < PVSNESButtonCount; j ++)
+            {
+                net_pad[i][j] = 0;
+                last_net_pad[i][j] = 0;
+            }
+        }
 	}
 	
 	return self;
@@ -358,10 +370,32 @@ static void FinalizeSamplesAudioCallback(void *)
 
 - (void)pushSNESButton:(PVSNESButton)button forPlayer:(NSInteger)player
 {
+    if (self.m_netDelegate)
+    {
+        net_pad[player][button] = 1;
+        return;
+    }
+    
+    [self internalPushSNESButton:button forPlayer:player];
+}
+
+- (void)internalPushSNESButton:(PVSNESButton)button forPlayer:(NSInteger)player
+{
     S9xReportButton((player+1 << 16) | button, true);
 }
 
 - (void)releaseSNESButton:(PVSNESButton)button forPlayer:(NSInteger)player
+{
+    if (self.m_netDelegate)
+    {
+        net_pad[player][button] = 0;
+        return;
+    }
+    
+    [self internalReleaseSNESButton:button forPlayer:player];
+}
+
+- (void)internalReleaseSNESButton:(PVSNESButton)button forPlayer:(NSInteger)player
 {
     S9xReportButton((player+1 << 16) | button, false);
 }
@@ -455,6 +489,50 @@ static void FinalizeSamplesAudioCallback(void *)
             S9xReportButton(playerMask | PVSNESButtonA, pad.buttonX.pressed);
         }
 #endif
+    }
+}
+
+#pragma mark - Controller
+-(unsigned long long) getControllerStatus
+{
+    unsigned long long tempResult = 0;
+    for (int deviceIndex = 0; deviceIndex < 2; deviceIndex ++)
+    {
+        for (int buttonIndex = 0; buttonIndex < PVSNESButtonCount; buttonIndex ++)
+        {
+            if (net_pad[deviceIndex][buttonIndex] == 0)
+            {
+                continue;
+            }
+            tempResult |= (1 << deviceIndex * PVSNESButtonCount + buttonIndex);
+        }
+    }
+    return tempResult;
+}
+
+-(void) updateControllerWithNetStatus:(unsigned long long) netStatus;
+{
+    for (int deviceIndex = 0; deviceIndex < 2; deviceIndex ++)
+    {
+        for (int buttonIndex = 0; buttonIndex < PVSNESButtonCount; buttonIndex ++)
+        {
+            if ((netStatus & (1 << deviceIndex * PVSNESButtonCount + buttonIndex)) == 0)
+            {
+                if (last_net_pad[deviceIndex][buttonIndex] != 0)
+                {
+                    last_net_pad[deviceIndex][buttonIndex] = 0;
+                    [self internalReleaseSNESButton:(PVSNESButton)buttonIndex forPlayer:deviceIndex];
+                }
+            }
+            else
+            {
+                if (last_net_pad[deviceIndex][buttonIndex] == 0)
+                {
+                    last_net_pad[deviceIndex][buttonIndex] = 1;
+                    [self internalPushSNESButton:(PVSNESButton)buttonIndex forPlayer:deviceIndex];
+                }
+            }
+        }
     }
 }
 

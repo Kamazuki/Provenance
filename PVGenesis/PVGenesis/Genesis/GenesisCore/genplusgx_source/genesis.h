@@ -63,6 +63,9 @@ extern uint8 zstate;
 extern uint8 pico_current;
 
 /* Function prototypes */
+extern void gen_clear_m68k(void);
+extern void gen_clear_z80(void);
+extern void gen_clear_PAIR(PAIR* temp);
 extern void gen_init(void);
 extern void gen_reset(int hard_reset);
 extern void gen_tmss_w(unsigned int offset, unsigned int data);

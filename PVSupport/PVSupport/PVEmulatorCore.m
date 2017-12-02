@@ -11,6 +11,10 @@
 #import "OERingBuffer.h"
 #import "RealTimeThread.h"
 
+@implementation PadNumber
+
+@end
+
 static Class PVEmulatorCoreClass = Nil;
 static NSTimeInterval defaultFrameInterval = 60.0;
 
@@ -52,6 +56,17 @@ NSString *const PVEmulatorCoreErrorDomain = @"com.jamsoftonline.EmulatorCore.Err
 	}
 	
     free(ringBuffers);
+}
+
+#pragma mark - Controller
+-(unsigned long long) getControllerStatus
+{
+    return 0;
+}
+
+-(void) updateControllerWithNetStatus:(unsigned long long) netStatus
+{
+    
 }
 
 #pragma mark - Execution
@@ -123,14 +138,57 @@ NSString *const PVEmulatorCoreErrorDomain = @"com.jamsoftonline.EmulatorCore.Err
     //Become a real-time thread:
     MakeCurrentThreadRealTime();
 
+    //进入循环前推送一次指令
+    if (self.m_netDelegate)
+    {
+        [self.m_netDelegate sendGameStatus:[self getControllerStatus]];
+    }
+    
     //Emulation loop
     while (!shouldStop) {
 
         [self updateControllers];
-        
         @synchronized (self) {
-            if (isRunning) {
-                [self executeFrame];
+            if (isRunning)
+            {
+                //如果是联机游戏
+                if (self.m_netDelegate)
+                {
+                    //判断网络数据是否准备好
+                    if ([self.m_netDelegate isGameStatusOk] == NO)
+                    {
+                        continue;
+                    }
+                    
+                    //执行常规帧
+                    unsigned long long tempGameStatus = [self.m_netDelegate nextGameStatus];
+                    [self updateControllerWithNetStatus:tempGameStatus];
+                    [self executeFrame];
+                    
+                    //每次执行完之后，推送下一帧指令
+                    [self.m_netDelegate sendGameStatus:[self getControllerStatus]];
+                    
+                    //本地执行速度是否落后，如果落后，需要跳帧
+                    if ([self.m_netDelegate shouldSkipFrame])
+                    {
+                        if ([self.m_netDelegate isGameStatusOk] == NO)
+                        {
+                            continue;
+                        }
+                        
+                        tempGameStatus = [self.m_netDelegate nextGameStatus];
+                        [self updateControllerWithNetStatus:tempGameStatus];
+                        [self executeFrame];
+                        
+                        //每次执行完之后，推送下一帧指令
+                        [self.m_netDelegate sendGameStatus:[self getControllerStatus]];
+                    }
+                }
+                else
+                {
+                    //没联网直接执行
+                    [self executeFrame];
+                }
             }
         }
         frameCount += 1;

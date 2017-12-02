@@ -47,6 +47,8 @@ typedef NS_ENUM(NSInteger, PVControllerButton) {
 @property (nonatomic, strong) UISelectionFeedbackGenerator *feedbackGenerator;
 #endif
 
+@property (nonatomic, strong) NSArray *controlLayout;
+
 - (id)initWithControlLayout:(NSArray *)controlLayout systemIdentifier:(NSString *)systemIdentifier;
 
 - (void)dPad:(JSDPad *)dPad didPressDirection:(JSDPadDirection)direction;
