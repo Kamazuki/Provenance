@@ -3,6 +3,14 @@ An iOS & tvOS Frontend for multiple emulators
 
 ![Provenance](https://static1.squarespace.com/static/584075871b631b9469f02885/t/58571894725e25a3d82cd6a9/1482102948632/?format=2500w)
 
+### Playing with friends using local network. (Kamazuki)
+
+please use branch named "branch/sync/20171202" to build your app!
+
+currently supported system:
+
+>SEGA MEGA DRIVE -- Sega Genesis 
+
 ### Building Provenance
 [See the instructions on the wiki](https://github.com/jasarien/Provenance/wiki/Building-Provenance) and follow them _to the letter_. Any issues raised that clearly demonstrate that the instructions haven't been followed will be closed.
 
